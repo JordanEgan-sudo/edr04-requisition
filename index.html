@@ -136,16 +136,16 @@
             saveDraft();
         }
 
-        function saveDraft() {
-            const rows = document.querySelectorAll('#tableBody tr');
-            const draft = [];
-            rows.forEach(row => {
-                const description = row.querySelector('input[type="text"]').value.trim();
-                const quantity = row.querySelector('input[type="number"]').value;
-                draft.push({ description, quantity });
-            });
-            localStorage.setItem('requisitionDraft', JSON.stringify(draft));
-        }
+function saveDraft() {
+    const rows = document.querySelectorAll('#tableBody tr');
+    const draft = [];
+    rows.forEach(row => {
+        const description = row.querySelector('input[type="text"]').value.trim();
+        const quantity = row.querySelector('input[type="number"]').value;
+        draft.push({ description, quantity }); // Changed 'Qty' to 'quantity'
+    });
+    localStorage.setItem('requisitionDraft', JSON.stringify(draft));
+}
 
         function loadDraft() {
             const draft = JSON.parse(localStorage.getItem('requisitionDraft') || '[]');
@@ -153,7 +153,7 @@
             tbody.innerHTML = '';
             draft.forEach(item => {
                 const row = document.createElement('tr');
-                row.innerHTML = `<td><input type="text" value="${item.description}" oninput="saveDraft()"></td><td><input type="number" value="${item.Qty}" min="0" oninput="saveDraft()"></td>`;
+                row.innerHTML = `<td><input type="text" value="${item.description}" oninput="saveDraft()"></td><td><input type="number" value="${item.quantity}" min="0" oninput="saveDraft()"></td>`;
                 tbody.appendChild(row);
             });
         }
@@ -343,6 +343,7 @@
     </script>
 </body>
 </html>
+
 
 
 
