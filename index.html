@@ -96,7 +96,7 @@
     <button id="logoutBtn" style="display:none;" onclick="logout()">Logout</button>
     <table id="orderTable">
         <thead>
-            <tr><th class="description">Item Description</th><th class="quantity">Qty</th></tr>
+            <tr><th class="description">Item Description</th><th class="Qty">Qty</th></tr>
         </thead>
         <tbody id="tableBody"></tbody>
     </table>
@@ -142,7 +142,7 @@
             rows.forEach(row => {
                 const description = row.querySelector('input[type="text"]').value.trim();
                 const quantity = row.querySelector('input[type="number"]').value;
-                draft.push({ description, quantity });
+                draft.push({ description, Qty });
             });
             localStorage.setItem('requisitionDraft', JSON.stringify(draft));
         }
@@ -153,7 +153,7 @@
             tbody.innerHTML = '';
             draft.forEach(item => {
                 const row = document.createElement('tr');
-                row.innerHTML = `<td><input type="text" value="${item.description}" oninput="saveDraft()"></td><td><input type="number" value="${item.quantity}" min="0" oninput="saveDraft()"></td>`;
+                row.innerHTML = `<td><input type="text" value="${item.description}" oninput="saveDraft()"></td><td><input type="number" value="${item.Qty}" min="0" oninput="saveDraft()"></td>`;
                 tbody.appendChild(row);
             });
         }
@@ -343,4 +343,5 @@
     </script>
 </body>
 </html>
+
 
