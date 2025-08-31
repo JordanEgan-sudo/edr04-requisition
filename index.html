@@ -94,6 +94,10 @@
     <div id="userInfo"></div>
     <button id="loginBtn" onclick="manualLogin()">Login with Microsoft 365</button>
     <button id="logoutBtn" style="display:none;" onclick="logout()">Logout</button>
+    <div>
+        <label for="orderName">Name:</label>
+        <input type="text" id="orderName" style="width: 200px; padding: 5px;" placeholder="Enter your name">
+    </div>
     <table id="orderTable">
         <thead>
             <tr><th class="description">Item Description</th><th class="qty">Qty</th></tr>
@@ -226,6 +230,7 @@
                 const siteId = await getSiteId();
                 const driveId = await getDriveId(siteId);
                 const rows = document.querySelectorAll('#tableBody tr');
+                const name = document.getElementById('orderName').value.trim();
                 let order = [], hasData = false;
                 rows.forEach(row => {
                     const description = row.querySelector('input[type="text"]').value.trim();
@@ -245,7 +250,7 @@
                         'Authorization': `Bearer ${accessToken}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ timestamp, items: order })
+                    body: JSON.stringify({ timestamp, name, items: order }) // Added name to saved data
                 });
                 if (!response.ok) throw new Error('Upload failed: ' + response.statusText);
                 showNotification('Order submitted successfully!', 'success');
@@ -291,7 +296,7 @@
                     const orderData = await fileResponse.json();
                     const orderDiv = document.createElement('div');
                     orderDiv.className = 'history-item';
-                    orderDiv.innerHTML = `<strong>Order - ${orderData.timestamp}</strong>`;
+                    orderDiv.innerHTML = `<strong>Order - ${orderData.name || 'Unnamed'} (${orderData.timestamp.split('T')[0]})</strong>`; // Show name and date
                     const table = document.createElement('table');
                     table.innerHTML = '<tr><th class="description">Description</th><th class="qty">Qty</th><th class="sent">Sent</th></tr>';
                     orderData.items.forEach((item, index) => {
