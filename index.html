@@ -96,7 +96,7 @@
     <button id="logoutBtn" style="display:none;" onclick="logout()">Logout</button>
     <table id="orderTable">
         <thead>
-            <tr><th class="description">Item Description</th><th class="quantity">Qty</th></tr>
+            <tr><th class="description">Item Description</th><th class="qty">Qty</th></tr>
         </thead>
         <tbody id="tableBody"></tbody>
     </table>
@@ -106,7 +106,6 @@
     <button onclick="clearDraft()">Clear Draft</button>
     <div id="history"></div>
     <div id="notification"></div>
-
     <script>
         const msalConfig = {
             auth: {
@@ -136,16 +135,16 @@
             saveDraft();
         }
 
-function saveDraft() {
-    const rows = document.querySelectorAll('#tableBody tr');
-    const draft = [];
-    rows.forEach(row => {
-        const description = row.querySelector('input[type="text"]').value.trim();
-        const quantity = row.querySelector('input[type="number"]').value;
-        draft.push({ description, quantity }); // Changed 'Qty' to 'quantity'
-    });
-    localStorage.setItem('requisitionDraft', JSON.stringify(draft));
-}
+        function saveDraft() {
+            const rows = document.querySelectorAll('#tableBody tr');
+            const draft = [];
+            rows.forEach(row => {
+                const description = row.querySelector('input[type="text"]').value.trim();
+                const quantity = row.querySelector('input[type="number"]').value;
+                draft.push({ description, quantity });
+            });
+            localStorage.setItem('requisitionDraft', JSON.stringify(draft));
+        }
 
         function loadDraft() {
             const draft = JSON.parse(localStorage.getItem('requisitionDraft') || '[]');
@@ -226,23 +225,20 @@ function saveDraft() {
                 const accessToken = await getAccessToken();
                 const siteId = await getSiteId();
                 const driveId = await getDriveId(siteId);
-
                 const rows = document.querySelectorAll('#tableBody tr');
                 let order = [], hasData = false;
                 rows.forEach(row => {
                     const description = row.querySelector('input[type="text"]').value.trim();
                     const quantity = parseInt(row.querySelector('input[type="number"]').value);
                     if (description && quantity > 0) {
-                        order.push({ description, Qty, sent: false });
+                        order.push({ description, quantity, sent: false });
                         hasData = true;
                     }
                 });
                 if (!hasData) return showNotification('Please enter at least one item.', 'error');
-
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
                 const fileName = `order-${timestamp}.json`;
                 const uploadUrl = `https://graph.microsoft.com/v1.0/drives/${driveId}/root:/RequisitionOrders/${fileName}:/content`;
-
                 const response = await fetch(uploadUrl, {
                     method: 'PUT',
                     headers: {
@@ -251,7 +247,6 @@ function saveDraft() {
                     },
                     body: JSON.stringify({ timestamp, items: order })
                 });
-
                 if (!response.ok) throw new Error('Upload failed: ' + response.statusText);
                 showNotification('Order submitted successfully!', 'success');
                 clearDraft();
@@ -267,30 +262,24 @@ function saveDraft() {
                 const driveId = await getDriveId(siteId);
                 const historyDiv = document.getElementById('history');
                 historyDiv.innerHTML = '<h3>Order History</h3>';
-
                 const response = await fetch(`https://graph.microsoft.com/v1.0/drives/${driveId}/root:/RequisitionOrders:/children`, {
                     headers: { Authorization: `Bearer ${accessToken}` }
                 });
-
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(`Failed to fetch orders: ${errorData.error?.message || response.statusText}`);
                 }
-
                 const data = await response.json();
                 if (!data.value || !Array.isArray(data.value)) {
                     historyDiv.innerHTML += '<p>No orders found in the RequisitionOrders folder.</p>';
                     return;
                 }
-
                 const orders = data.value.filter(file => file.name.endsWith('.json'));
                 if (orders.length === 0) {
                     historyDiv.innerHTML += '<p>No JSON orders found in the RequisitionOrders folder.</p>';
                     return;
                 }
-
                 orders.sort((a, b) => new Date(b.lastModifiedDateTime) - new Date(a.lastModifiedDateTime));
-
                 for (const order of orders) {
                     const fileResponse = await fetch(`https://graph.microsoft.com/v1.0/drives/${driveId}/items/${order.id}/content`, {
                         headers: { Authorization: `Bearer ${accessToken}` }
@@ -304,9 +293,9 @@ function saveDraft() {
                     orderDiv.className = 'history-item';
                     orderDiv.innerHTML = `<strong>Order - ${orderData.timestamp}</strong>`;
                     const table = document.createElement('table');
-                    table.innerHTML = '<tr><th class="description">Description</th><th class="Qty">Qty</th><th class="sent">Sent</th></tr>';
+                    table.innerHTML = '<tr><th class="description">Description</th><th class="qty">Qty</th><th class="sent">Sent</th></tr>';
                     orderData.items.forEach((item, index) => {
-                        table.innerHTML += `<tr><td class="description">${item.description}</td><td class="Qtyy">${item.Qty}</td><td class="sent"><input type="checkbox" ${item.sent ? 'checked' : ''} onchange="updateSentStatus('${driveId}', '${order.id}', ${index}, this.checked)"></td></tr>`;
+                        table.innerHTML += `<tr><td class="description">${item.description}</td><td class="qty">${item.quantity}</td><td class="sent"><input type="checkbox" ${item.sent ? 'checked' : ''} onchange="updateSentStatus('${driveId}', '${order.id}', ${index}, this.checked)"></td></tr>`;
                     });
                     orderDiv.appendChild(table);
                     historyDiv.appendChild(orderDiv);
@@ -324,7 +313,6 @@ function saveDraft() {
                 });
                 const orderData = await fileResponse.json();
                 orderData.items[itemIndex].sent = isSent;
-
                 const updateResponse = await fetch(`https://graph.microsoft.com/v1.0/drives/${driveId}/items/${orderId}/content`, {
                     method: 'PUT',
                     headers: {
@@ -333,7 +321,6 @@ function saveDraft() {
                     },
                     body: JSON.stringify(orderData)
                 });
-
                 if (!updateResponse.ok) throw new Error('Failed to update status: ' + updateResponse.statusText);
                 showNotification('Sent status updated.', 'success');
             } catch (error) {
@@ -343,8 +330,3 @@ function saveDraft() {
     </script>
 </body>
 </html>
-
-
-
-
-
