@@ -38,6 +38,18 @@
             padding: 5px;
             box-sizing: border-box;
         }
+        textarea {
+            width: 100%;
+            padding: 5px;
+            box-sizing: border-box;
+            resize: none;
+            overflow: hidden;
+            min-height: 30px;
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
         button {
             padding: 10px 20px;
             margin: 5px;
@@ -78,6 +90,7 @@
             #history table th.qty, #history table td.qty { width: 5%; }
             #history table th.sent, #history table td.sent { width: 5%; }
             input[type="text"], input[type="number"] { font-size: 14px; }
+            textarea { font-size: 14px; }
             #history table th.qty, #history table td.qty,
             #history table th.sent, #history table td.sent {
                 font-size: 12px;
@@ -134,7 +147,7 @@
         function addRow() {
             const tbody = document.getElementById('tableBody');
             const row = document.createElement('tr');
-            row.innerHTML = `<td><input type="text" oninput="saveDraft()"></td><td><input type="number" min="0" oninput="saveDraft()"></td>`;
+            row.innerHTML = `<td><textarea oninput="saveDraft(); autoResize(this)"></textarea></td><td><input type="number" min="0" oninput="saveDraft()"></td>`;
             tbody.appendChild(row);
             saveDraft();
         }
@@ -143,7 +156,7 @@
             const rows = document.querySelectorAll('#tableBody tr');
             const draft = [];
             rows.forEach(row => {
-                const description = row.querySelector('input[type="text"]').value.trim();
+                const description = row.querySelector('textarea').value.trim();
                 const quantity = row.querySelector('input[type="number"]').value;
                 draft.push({ description, quantity });
             });
@@ -156,9 +169,15 @@
             tbody.innerHTML = '';
             draft.forEach(item => {
                 const row = document.createElement('tr');
-                row.innerHTML = `<td><input type="text" value="${item.description}" oninput="saveDraft()"></td><td><input type="number" value="${item.quantity}" min="0" oninput="saveDraft()"></td>`;
+                row.innerHTML = `<td><textarea oninput="saveDraft(); autoResize(this)">${item.description}</textarea></td><td><input type="number" value="${item.quantity}" min="0" oninput="saveDraft()"></td>`;
                 tbody.appendChild(row);
             });
+            document.querySelectorAll('textarea').forEach(textarea => autoResize(textarea));
+        }
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = `${textarea.scrollHeight}px`;
         }
 
         function clearDraft() {
@@ -233,7 +252,7 @@
                 const name = document.getElementById('orderName').value.trim();
                 let order = [], hasData = false;
                 rows.forEach(row => {
-                    const description = row.querySelector('input[type="text"]').value.trim();
+                    const description = row.querySelector('textarea').value.trim();
                     const quantity = parseInt(row.querySelector('input[type="number"]').value);
                     if (description && quantity > 0) {
                         order.push({ description, quantity, sent: false });
@@ -250,7 +269,7 @@
                         'Authorization': `Bearer ${accessToken}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ timestamp, name, items: order }) // Added name to saved data
+                    body: JSON.stringify({ timestamp, name, items: order })
                 });
                 if (!response.ok) throw new Error('Upload failed: ' + response.statusText);
                 showNotification('Order submitted successfully!', 'success');
@@ -296,7 +315,7 @@
                     const orderData = await fileResponse.json();
                     const orderDiv = document.createElement('div');
                     orderDiv.className = 'history-item';
-                    orderDiv.innerHTML = `<strong>Order - ${orderData.name || 'Unnamed'} (${orderData.timestamp.split('T')[0]})</strong>`; // Show name and date
+                    orderDiv.innerHTML = `<strong>Order - ${orderData.name || 'Unnamed'} (${orderData.timestamp.split('T')[0]})</strong>`;
                     const table = document.createElement('table');
                     table.innerHTML = '<tr><th class="description">Description</th><th class="qty">Qty</th><th class="sent">Sent</th></tr>';
                     orderData.items.forEach((item, index) => {
