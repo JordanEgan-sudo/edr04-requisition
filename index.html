@@ -233,7 +233,7 @@
                     const description = row.querySelector('input[type="text"]').value.trim();
                     const quantity = parseInt(row.querySelector('input[type="number"]').value);
                     if (description && quantity > 0) {
-                        order.push({ description, quantity, sent: false });
+                        order.push({ description, Qty, sent: false });
                         hasData = true;
                     }
                 });
@@ -304,9 +304,9 @@
                     orderDiv.className = 'history-item';
                     orderDiv.innerHTML = `<strong>Order - ${orderData.timestamp}</strong>`;
                     const table = document.createElement('table');
-                    table.innerHTML = '<tr><th class="description">Description</th><th class="quantity">Quantity</th><th class="sent">Sent</th></tr>';
+                    table.innerHTML = '<tr><th class="description">Description</th><th class="Qty">Qty</th><th class="sent">Sent</th></tr>';
                     orderData.items.forEach((item, index) => {
-                        table.innerHTML += `<tr><td class="description">${item.description}</td><td class="quantity">${item.quantity}</td><td class="sent"><input type="checkbox" ${item.sent ? 'checked' : ''} onchange="updateSentStatus('${driveId}', '${order.id}', ${index}, this.checked)"></td></tr>`;
+                        table.innerHTML += `<tr><td class="description">${item.description}</td><td class="Qtyy">${item.Qty}</td><td class="sent"><input type="checkbox" ${item.sent ? 'checked' : ''} onchange="updateSentStatus('${driveId}', '${order.id}', ${index}, this.checked)"></td></tr>`;
                     });
                     orderDiv.appendChild(table);
                     historyDiv.appendChild(orderDiv);
@@ -343,5 +343,6 @@
     </script>
 </body>
 </html>
+
 
 
