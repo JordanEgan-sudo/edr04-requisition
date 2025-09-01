@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EDR04 Requisition Requests</title>
     <script src="https://alcdn.msauth.net/browser/2.30.0/js/msal-browser.min.js"></script>
+<script src="https://res.cdn.office.net/teams-js/2.0.0/js/MicrosoftTeams.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -195,19 +196,25 @@
             setTimeout(() => notification.style.display = 'none', 3000);
         }
 
-        async function manualLogin() {
-            try {
-                const loginResponse = await msalInstance.loginPopup({ scopes: ["Sites.ReadWrite.All", "User.Read", "Mail.Send"] });
-                document.getElementById('userInfo').textContent = `Logged in as ${loginResponse.account.username}`;
-                document.getElementById('loginBtn').style.display = 'none';
-                document.getElementById('logoutBtn').style.display = 'inline-block';
-                showNotification('Login successful!', 'success');
-            } catch (error) {
-                showNotification('Login failed: ' + error.message, 'error');
-            }
+        function manualLogin() {
+    microsoftTeams.initialize();
+    microsoftTeams.authentication.authenticate({
+        url: window.location.origin + "/auth-start.html",
+        width: 600,
+        height: 535,
+        successCallback: function (result) {
+            document.getElementById('userInfo').textContent = "Login successful.";
+            document.getElementById('loginBtn').style.display = 'none';
+            document.getElementById('logoutBtn').style.display = 'inline-block';
+            showNotification('Login successful!', 'success');
+        },
+        failureCallback: function (error) {
+            showNotification('Login failed: ' + error, 'error');
         }
+    });
+}
 
-        function logout() {
+function logout() {
             msalInstance.logoutPopup();
         }
 
