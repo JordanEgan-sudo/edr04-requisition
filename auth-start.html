@@ -1,23 +1,38 @@
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Authentication Start</title>
-    <script src="https://res.cdn.office.net/teams-js/2.0.0/js/MicrosoftTeams.min.js"></script>
-</head>
-<body>
-    <script>
+function manualLogin() {
+    if (isInTeams) {
         microsoftTeams.initialize();
-        microsoftTeams.authentication.getAuthToken({
-            successCallback: function (token) {
-                microsoftTeams.authentication.notifySuccess(token);
+        microsoftTeams.authentication.authenticate({
+            url: window.location.origin + "/auth-start.html",
+            width: 600,
+            height: 535,
+            successCallback: async (accessToken) => {
+                try {
+                    // Store the access token or use it directly
+                    document.getElementById('userInfo').textContent = "Login successful.";
+                    document.getElementById('loginBtn').style.display = 'none';
+                    document.getElementById('logoutBtn').style.display = 'inline-block';
+                    showNotification('Login successful!', 'success');
+                    // Optionally, store the token or refresh MSAL account
+                    const accounts = msalInstance.getAllAccounts();
+                    if (accounts.length > 0) {
+                        document.getElementById('userInfo').textContent = `Logged in as ${accounts[0].username}`;
+                    }
+                } catch (error) {
+                    showNotification(`Error processing login: ${error.message}`, 'error');
+                }
             },
-            failureCallback: function (error) {
-                microsoftTeams.authentication.notifyFailure(error);
+            failureCallback: (error) => {
+                showNotification(`Login failed: ${error}`, 'error');
             }
         });
-    </script>
-</body>
-</html>
+    } else {
+        msalInstance.loginPopup({ scopes: appConfig.scopes }).then(response => {
+            document.getElementById('userInfo').textContent = `Logged in as ${response.account.username}`;
+            document.getElementById('loginBtn').style.display = 'none';
+            document.getElementById('logoutBtn').style.display = 'inline-block';
+            showNotification('Login successful!', 'success');
+        }).catch(error => {
+            showNotification(`Login failed: ${error.message}`, 'error');
+        });
+    }
+}
