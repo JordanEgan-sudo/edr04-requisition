@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EDR04 Requisition Requests</title>
     <script src="https://alcdn.msauth.net/browser/2.30.0/js/msal-browser.min.js"></script>
-<script src="https://res.cdn.office.net/teams-js/2.0.0/js/MicrosoftTeams.min.js"></script>
+    <script src="https://res.cdn.office.net/teams-js/2.0.0/js/MicrosoftTeams.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -27,8 +27,9 @@
             overflow-wrap: break-word;
         }
         /* Input table styles */
-        th.description, td.description { width: 85%; }
+        th.description, td.description { width: 70%; }
         th.qty, td.qty { width: 15%; }
+        th.action, td.action { width: 15%; }
         /* History table styles */
         #history table th.description, #history table td.description { width: 85%; }
         #history table th.qty, #history table td.qty { width: 7.5%; }
@@ -61,6 +62,10 @@
             border-radius: 4px;
         }
         button:hover { background-color: #45a049; }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
         #history { margin-top: 20px; }
         .history-item {
             margin-bottom: 10px;
@@ -81,12 +86,12 @@
         }
         .success { background-color: #4CAF50; }
         .error { background-color: #f44336; }
+        .loading { background-color: #2196F3; }
         /* Mobile adjustments */
         @media (max-width: 600px) {
-            /* Input table */
-            th.description, td.description { width: 75%; }
-            th.qty, td.qty { width: 25%; }
-            /* History table */
+            th.description, td.description { width: 60%; }
+            th.qty, td.qty { width: 20%; }
+            th.action, td.action { width: 20%; }
             #history table th.description, #history table td.description { width: 90%; }
             #history table th.qty, #history table td.qty { width: 5%; }
             #history table th.sent, #history table td.sent { width: 5%; }
@@ -110,29 +115,52 @@
     <button id="logoutBtn" style="display:none;" onclick="logout()">Logout</button>
     <div>
         <label for="orderName">Name:</label>
-        <input type="text" id="orderName" style="width: 200px; padding: 5px;" placeholder="Enter your name">
+        <input type="text" id="orderName" style="width: 200px; padding: 5px;" placeholder="Enter your name" oninput="saveDraft()">
     </div>
     <table id="orderTable">
         <thead>
-            <tr><th class="description">Item Description</th><th class="qty">Qty</th></tr>
+            <tr>
+                <th class="description">Item Description</th>
+                <th class="qty">Qty</th>
+                <th class="action">Action</th>
+            </tr>
         </thead>
         <tbody id="tableBody"></tbody>
     </table>
     <button onclick="addRow()">Add Row</button>
-    <button onclick="submitOrder()">Submit Order</button>
-    <button onclick="viewHistory()">View History</button>
+    <button onclick="submitOrder()" id="submitBtn">Submit Order</button>
+    <button onclick="viewHistory()" id="historyBtn">View History</button>
     <button onclick="clearDraft()">Clear Draft</button>
     <div id="history"></div>
     <div id="notification"></div>
     <script>
+        const appConfig = {
+            clientId: "02dd7c60-73b4-4844-ac5e-a59432b7ef0e",
+            tenantId: "2baf49ab-8db0-4439-a6e0-b7a94605a7c6",
+            redirectUri: "https://jordanegan-sudo.github.io/edr04-requisition/edr04-requisition.html",
+            sharePointSite: "egandrilling.sharepoint.com:/sites/EDR049",
+            libraryName: "RequisitionOrders",
+            emailRecipients: ["jordan@egandrilling.com.au", "callum@egandrilling.com.au"],
+            scopes: [
+                "Sites.ReadWrite.All",
+                "Mail.Send",
+                "api://jordanegan-sudo.github.io/02dd7c60-73b4-4844-ac5e-a59432b7ef0e/access_as_user"
+            ]
+        };
+
         const msalConfig = {
             auth: {
-                clientId: "02dd7c60-73b4-4844-ac5e-a59432b7ef0e",
-                authority: "https://login.microsoftonline.com/2baf49ab-8db0-4439-a6e0-b7a94605a7c6",
-                redirectUri: "https://jordanegan-sudo.github.io/edr04-requisition/"
+                clientId: appConfig.clientId,
+                authority: `https://login.microsoftonline.com/${appConfig.tenantId}`,
+                redirectUri: appConfig.redirectUri
             }
         };
         const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+        let isInTeams = false;
+        microsoftTeams.getContext((context) => {
+            if (context) isInTeams = true;
+        });
 
         window.onload = function() {
             loadDraft();
@@ -148,31 +176,42 @@
         function addRow() {
             const tbody = document.getElementById('tableBody');
             const row = document.createElement('tr');
-            row.innerHTML = `<td><textarea oninput="saveDraft(); autoResize(this)"></textarea></td><td><input type="number" min="0" oninput="saveDraft()"></td>`;
+            row.innerHTML = `
+                <td class="description"><textarea oninput="saveDraft(); autoResize(this)" aria-label="Item Description"></textarea></td>
+                <td class="qty"><input type="number" min="0" oninput="saveDraft()" aria-label="Quantity"></td>
+                <td class="action"><button onclick="this.parentElement.parentElement.remove(); saveDraft()">Remove</button></td>`;
             tbody.appendChild(row);
             saveDraft();
         }
 
         function saveDraft() {
             const rows = document.querySelectorAll('#tableBody tr');
-            const draft = [];
+            const name = document.getElementById('orderName').value.trim();
+            const draft = { name, items: [] };
             rows.forEach(row => {
                 const description = row.querySelector('textarea').value.trim();
                 const quantity = row.querySelector('input[type="number"]').value;
-                draft.push({ description, quantity });
+                draft.items.push({ description, quantity });
             });
             localStorage.setItem('requisitionDraft', JSON.stringify(draft));
         }
 
         function loadDraft() {
-            const draft = JSON.parse(localStorage.getItem('requisitionDraft') || '[]');
+            const draft = JSON.parse(localStorage.getItem('requisitionDraft') || '{}');
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
-            draft.forEach(item => {
+            document.getElementById('orderName').value = draft.name || '';
+            (draft.items || []).forEach(item => {
                 const row = document.createElement('tr');
-                row.innerHTML = `<td><textarea oninput="saveDraft(); autoResize(this)">${item.description}</textarea></td><td><input type="number" value="${item.quantity}" min="0" oninput="saveDraft()"></td>`;
+                row.innerHTML = `
+                    <td class="description"><textarea oninput="saveDraft(); autoResize(this)" aria-label="Item Description">${item.description}</textarea></td>
+                    <td class="qty"><input type="number" value="${item.quantity}" min="0" oninput="saveDraft()" aria-label="Quantity"></td>
+                    <td class="action"><button onclick="this.parentElement.parentElement.remove(); saveDraft()">Remove</button></td>`;
                 tbody.appendChild(row);
             });
+            if (!draft.items || draft.items.length === 0) {
+                for (let i = 0; i < 15; i++) addRow();
+            }
             document.querySelectorAll('textarea').forEach(textarea => autoResize(textarea));
         }
 
@@ -184,8 +223,9 @@
         function clearDraft() {
             localStorage.removeItem('requisitionDraft');
             document.getElementById('tableBody').innerHTML = '';
+            document.getElementById('orderName').value = '';
             for (let i = 0; i < 15; i++) addRow();
-            showNotification('Order Submitted!', 'success');
+            showNotification('Draft cleared!', 'success');
         }
 
         function showNotification(message, type) {
@@ -197,44 +237,72 @@
         }
 
         function manualLogin() {
-    microsoftTeams.initialize();
-    microsoftTeams.authentication.authenticate({
-        url: window.location.origin + "/auth-start.html",
-        width: 600,
-        height: 535,
-        successCallback: function (result) {
-            document.getElementById('userInfo').textContent = "Login successful.";
-            document.getElementById('loginBtn').style.display = 'none';
-            document.getElementById('logoutBtn').style.display = 'inline-block';
-            showNotification('Login successful!', 'success');
-        },
-        failureCallback: function (error) {
-            showNotification('Login failed: ' + error, 'error');
+            if (isInTeams) {
+                microsoftTeams.initialize();
+                microsoftTeams.authentication.authenticate({
+                    url: window.location.origin + "/auth-start.html",
+                    width: 600,
+                    height: 535,
+                    successCallback: (result) => {
+                        document.getElementById('userInfo').textContent = "Login successful.";
+                        document.getElementById('loginBtn').style.display = 'none';
+                        document.getElementById('logoutBtn').style.display = 'inline-block';
+                        showNotification('Login successful!', 'success');
+                    },
+                    failureCallback: (error) => {
+                        showNotification(`Login failed: ${error}`, 'error');
+                    }
+                });
+            } else {
+                msalInstance.loginPopup({ scopes: appConfig.scopes }).then(response => {
+                    document.getElementById('userInfo').textContent = `Logged in as ${response.account.username}`;
+                    document.getElementById('loginBtn').style.display = 'none';
+                    document.getElementById('logoutBtn').style.display = 'inline-block';
+                    showNotification('Login successful!', 'success');
+                }).catch(error => {
+                    showNotification(`Login failed: ${error.message}`, 'error');
+                });
+            }
         }
-    });
-}
 
-function logout() {
-            msalInstance.logoutPopup();
+        function logout() {
+            msalInstance.logoutPopup().then(() => {
+                document.getElementById('userInfo').textContent = '';
+                document.getElementById('loginBtn').style.display = 'inline-block';
+                document.getElementById('logoutBtn').style.display = 'none';
+                showNotification('Logged out successfully!', 'success');
+            }).catch(error => {
+                showNotification(`Logout failed: ${error.message}`, 'error');
+            });
         }
 
         async function getAccessToken() {
             const accounts = msalInstance.getAllAccounts();
             if (accounts.length === 0) throw new Error('No authenticated account found. Please log in.');
             try {
-                const response = await msalInstance.acquireTokenSilent({ scopes: ["Sites.ReadWrite.All", "Mail.Send"], account: accounts[0] });
+                const response = await msalInstance.acquireTokenSilent({
+                    scopes: appConfig.scopes,
+                    account: accounts[0]
+                });
                 return response.accessToken;
-            } catch {
-                const response = await msalInstance.acquireTokenPopup({ scopes: ["Sites.ReadWrite.All", "Mail.Send"], account: accounts[0] });
+            } catch (error) {
+                const response = await msalInstance.acquireTokenPopup({
+                    scopes: appConfig.scopes,
+                    account: accounts[0]
+                });
                 return response.accessToken;
             }
         }
 
         async function getSiteId() {
             const accessToken = await getAccessToken();
-            const response = await fetch("https://graph.microsoft.com/v1.0/sites/egandrilling.sharepoint.com:/sites/EDR049", {
+            const response = await fetch(`https://graph.microsoft.com/v1.0/sites/${appConfig.sharePointSite}`, {
                 headers: { Authorization: `Bearer ${accessToken}` }
             });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`Failed to fetch site: ${errorData.error?.message || response.statusText}`);
+            }
             const data = await response.json();
             return data.id;
         }
@@ -244,9 +312,13 @@ function logout() {
             const response = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/drives`, {
                 headers: { Authorization: `Bearer ${accessToken}` }
             });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`Failed to fetch drives: ${errorData.error?.message || response.statusText}`);
+            }
             const data = await response.json();
-            const drive = data.value.find(d => d.name === "RequisitionOrders");
-            if (!drive) throw new Error("RequisitionOrders library not found.");
+            const drive = data.value.find(d => d.name === appConfig.libraryName);
+            if (!drive) throw new Error(`${appConfig.libraryName} library not found.`);
             return drive.id;
         }
 
@@ -254,7 +326,7 @@ function logout() {
             const emailBody = `
                 <h3>New Requisition Order Submitted</h3>
                 <p><strong>Submitted by:</strong> ${name || 'Unnamed'}</p>
-                <p><strong>Timestamp:</strong> ${timestamp.split('T')[0]}</p>
+                <p><strong>Timestamp:</strong> ${timestamp.split('_')[0]}</p>
                 <h4>Order Details:</h4>
                 <table border="1" style="border-collapse: collapse;">
                     <tr><th style="padding: 8px;">Item Description</th><th style="padding: 8px;">Quantity</th></tr>
@@ -263,15 +335,12 @@ function logout() {
             `;
             const email = {
                 message: {
-                    subject: `New Requisition Order - ${timestamp.split('T')[0]}`,
+                    subject: `New Requisition Order - ${timestamp.split('_')[0]}`,
                     body: {
                         contentType: "HTML",
                         content: emailBody
                     },
-                    toRecipients: [
-                        { emailAddress: { address: "jordan@egandrilling.com.au" } },
-                        { emailAddress: { address: "callum@egandrilling.com.au" } }
-                    ]
+                    toRecipients: appConfig.emailRecipients.map(address => ({ emailAddress: { address } }))
                 },
                 saveToSentItems: true
             };
@@ -290,12 +359,19 @@ function logout() {
         }
 
         async function submitOrder() {
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            showNotification('Submitting order...', 'loading');
             try {
                 const accessToken = await getAccessToken();
                 const siteId = await getSiteId();
                 const driveId = await getDriveId(siteId);
                 const rows = document.querySelectorAll('#tableBody tr');
                 const name = document.getElementById('orderName').value.trim();
+                if (!name) {
+                    submitBtn.disabled = false;
+                    return showNotification('Please enter a name.', 'error');
+                }
                 let order = [], hasData = false;
                 rows.forEach(row => {
                     const description = row.querySelector('textarea').value.trim();
@@ -305,10 +381,13 @@ function logout() {
                         hasData = true;
                     }
                 });
-                if (!hasData) return showNotification('Please enter at least one item.', 'error');
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                if (!hasData) {
+                    submitBtn.disabled = false;
+                    return showNotification('Please enter at least one valid item (description and quantity > 0).', 'error');
+                }
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '_');
                 const fileName = `order-${timestamp}.json`;
-                const uploadUrl = `https://graph.microsoft.com/v1.0/drives/${driveId}/root:/RequisitionOrders/${fileName}:/content`;
+                const uploadUrl = `https://graph.microsoft.com/v1.0/drives/${driveId}/root:/${appConfig.libraryName}/${fileName}:/content`;
                 const response = await fetch(uploadUrl, {
                     method: 'PUT',
                     headers: {
@@ -317,24 +396,31 @@ function logout() {
                     },
                     body: JSON.stringify({ timestamp, name, items: order })
                 });
-                if (!response.ok) throw new Error('Upload failed: ' + response.statusText);
-                // Send email notification
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`Upload failed: ${errorData.error?.message || response.statusText}`);
+                }
                 await sendOrderEmail(accessToken, order, name, timestamp);
                 showNotification('Order submitted and email sent successfully!', 'success');
                 clearDraft();
             } catch (error) {
-                showNotification('Error: ' + error.message, 'error');
+                showNotification(`Error: ${error.message}`, 'error');
+            } finally {
+                submitBtn.disabled = false;
             }
         }
 
         async function viewHistory() {
+            const historyBtn = document.getElementById('historyBtn');
+            historyBtn.disabled = true;
+            showNotification('Loading history...', 'loading');
             try {
                 const accessToken = await getAccessToken();
                 const siteId = await getSiteId();
                 const driveId = await getDriveId(siteId);
                 const historyDiv = document.getElementById('history');
                 historyDiv.innerHTML = '<h3>Order History</h3>';
-                const response = await fetch(`https://graph.microsoft.com/v1.0/drives/${driveId}/root:/RequisitionOrders:/children`, {
+                const response = await fetch(`https://graph.microsoft.com/v1.0/drives/${driveId}/root:/${appConfig.libraryName}:/children`, {
                     headers: { Authorization: `Bearer ${accessToken}` }
                 });
                 if (!response.ok) {
@@ -363,17 +449,25 @@ function logout() {
                     const orderData = await fileResponse.json();
                     const orderDiv = document.createElement('div');
                     orderDiv.className = 'history-item';
-                    orderDiv.innerHTML = `<strong>Order - ${orderData.name || 'Unnamed'} (${orderData.timestamp.split('T')[0]})</strong>`;
+                    orderDiv.innerHTML = `<strong>Order - ${orderData.name || 'Unnamed'} (${orderData.timestamp.split('_')[0]})</strong>`;
                     const table = document.createElement('table');
                     table.innerHTML = '<tr><th class="description">Description</th><th class="qty">Qty</th><th class="sent">Sent</th></tr>';
                     orderData.items.forEach((item, index) => {
-                        table.innerHTML += `<tr><td class="description">${item.description}</td><td class="qty">${item.quantity}</td><td class="sent"><input type="checkbox" ${item.sent ? 'checked' : ''} onchange="updateSentStatus('${driveId}', '${order.id}', ${index}, this.checked)"></td></tr>`;
+                        table.innerHTML += `
+                            <tr>
+                                <td class="description">${item.description}</td>
+                                <td class="qty">${item.quantity}</td>
+                                <td class="sent"><input type="checkbox" ${item.sent ? 'checked' : ''} onchange="updateSentStatus('${driveId}', '${order.id}', ${index}, this.checked)" aria-label="Sent status"></td>
+                            </tr>`;
                     });
                     orderDiv.appendChild(table);
                     historyDiv.appendChild(orderDiv);
                 }
+                showNotification('History loaded successfully!', 'success');
             } catch (error) {
                 showNotification(`Error loading history: ${error.message}`, 'error');
+            } finally {
+                historyBtn.disabled = false;
             }
         }
 
@@ -383,6 +477,10 @@ function logout() {
                 const fileResponse = await fetch(`https://graph.microsoft.com/v1.0/drives/${driveId}/items/${orderId}/content`, {
                     headers: { Authorization: `Bearer ${accessToken}` }
                 });
+                if (!fileResponse.ok) {
+                    const errorData = await fileResponse.json();
+                    throw new Error(`Failed to fetch order: ${errorData.error?.message || fileResponse.statusText}`);
+                }
                 const orderData = await fileResponse.json();
                 orderData.items[itemIndex].sent = isSent;
                 const updateResponse = await fetch(`https://graph.microsoft.com/v1.0/drives/${driveId}/items/${orderId}/content`, {
@@ -393,10 +491,13 @@ function logout() {
                     },
                     body: JSON.stringify(orderData)
                 });
-                if (!updateResponse.ok) throw new Error('Failed to update status: ' + updateResponse.statusText);
+                if (!updateResponse.ok) {
+                    const errorData = await updateResponse.json();
+                    throw new Error(`Failed to update status: ${errorData.error?.message || updateResponse.statusText}`);
+                }
                 showNotification('Sent status updated.', 'success');
             } catch (error) {
-                showNotification('Error updating status: ' + error.message, 'error');
+                showNotification(`Error updating status: ${error.message}`, 'error');
             }
         }
     </script>
